@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>BuyLog: Product Purchase Tracker</title>
+<link rel="manifest" href="manifest.json">
+<script>
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('service-worker.js')
+            .then(registration => {
+                console.log('Service Worker registered with scope:', registration.scope);
+            })
+            .catch(error => {
+                console.log('Service Worker registration failed:', error);
+            });
+    }
+</script>
+<style>
+    body {
+        font-family: Arial, sans-serif;
+        background-color: #121212;
+        color: #ffffff;
+        margin: 0;
+        padding: 20px;
+        text-align: center;
+    }
+
+    #add-product-btn, #import-btn, #export-btn, #modify-btn {
+        background-color: #4B0082;
+        color: #ffffff;
+        padding: 10px 20px;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        margin-bottom: 20px;
+        margin: 0 10px;
+    }
+
+    #add-product-btn:hover, #import-btn:hover, #export-btn:hover, #modify-btn:hover {
+        background-color: #804ffb;
+    }
+
+    .disabled {
+        background-color: #808080;
+        cursor: not-allowed;
+    }
+
+    #product-form {
+        background-color: #2E0854;
+        padding: 20px;
+        border: 1px solid #ffffff;
+        border-radius: 10px;
+        box-shadow: 0 0 10px rgba(0,0,0,0.1);
+        display: none;
+        position: relative;
+        width: 300px;
+        margin: 0 auto;
+    }
+
+    #product-form-input {
+        display: flex;
+        flex-direction: column;
+    }
+
+    label {
+        margin-bottom: 5px;
+    }
+
+    input, select {
+        padding: 10px;
+        margin-bottom: 20px;
+        border: 1px solid #ccc;
+        border-radius: 5px;
+    }
+
+    #price::before {
+        content: '₹';
+    }
+
+    #save-product-btn, #delete-product-btn {
+        background-color: #4CAF50;
+        color: #000000;
+        padding: 10px 20px;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        width: 48%;
+    }
+
+    #save-product-btn:hover {
+        background-color: #0084ff;
+    }
+
+    #delete-product-btn {
+        background-color: #ff0000;
+    }
+
+    #delete-product-btn:hover {
+        background-color: #cc0000;
+    }
+
+    #product-table {
+        margin-top: 20px;
+        border-collapse: collapse;
+        width: 100%;
+    }
+
+    th, td {
+        border: 1px solid #ddd;
+        padding: 10px;
+        text-align: left;
+        cursor: pointer;
+    }
+
+    th {
+        background-color: #820000;
+    }
+
+    th:nth-child(1) {
+        width: 40%;
+    }
+
+    th:nth-child(2), th:nth-child(3), th:nth-child(4), th:nth-child(5) {
+        width: 15%;
+    }
+
+    .close-btn {
+        position: absolute;
+        top: 10px;
+        right: 10px;
+        background-color: #ff0000;
+        color: #fff;
+        border: none;
+        border-radius: 50%;
+        cursor: pointer;
+        width: 45px;
+        height: 45px;
+        text-align: center;
+        line-height: 25px;
+    }
+
+    .close-btn:hover {
+        background-color: #cc0000;
+    }
+
+    .highlight {
+        background-color: #f7007f;
+    }
+
+    .button-row {
+        display: flex;
+        justify-content: space-between;
+    }
+
+    .edit-btn {
+        background-color: #4CAF50;
+        color: #000000;
+        padding: 5px 10px;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        display: block;
+        margin: 0 auto;
+    }
+
+    .edit-btn:hover {
+        background-color: #0084ff;
+    }
+
+    .date-input {
+        position: relative;
+    }
+
+    .date-input input {
+        padding-left: 10px;
+        font-family: monospace;
+    }
+
+    .date-input input::placeholder {
+        color: #000000;
+        font-family: canva sans;
+    }
+</style>
+</head>
+<body>
+<h1>BuyLog: Product Purchase Tracker</h1>
+<div>
+    <button id="add-product-btn">Add Product</button>
+    <button id="import-btn">Import</button>
+    <button id="export-btn">Export</button>
+    <button id="modify-btn">Modify</button>
+</div>
+<div id="product-form">
+    <button class="close-btn" onclick="closeForm()">X</button>
+    <form id="product-form-input">
+        <label for="product-name">Product Name:</label>
+        <input type="text" id="product-name" required onkeydown="moveToNextInput(event, 'price')">
+
+        <label for="price">Price (₹):</label>
+        <input type="number" id="price" required onkeydown="moveToNextInput(event, 'buy-date-day')">
+
+        <label for="buy-date-day">Buy Date:</label>
+        <div class="date-input">
+            <input type="text" id="buy-date-day" placeholder="DD" maxlength="2" required onkeydown="moveToNextInput(event, 'buy-date-month')">
+            <input type="text" id="buy-date-month" placeholder="MM" maxlength="2" required onkeydown="moveToNextInput(event, 'buy-date-year')">
+            <input type="text" id="buy-date-year" placeholder="YYYY" maxlength="4" required onkeydown="moveToNextInput(event, 'warranty-registered')">
+        </div>
+
+        <div style="display: flex; align-items: center; flex-wrap: wrap;">
+            <label for="warranty-registered">Warranty Registered:</label>
+            <select id="warranty-registered" required>
+                <option value="yes">Yes</option>
+                <option value="no">No</option>
+            </select>
+            <label for="warranty-period" style="margin-left: 20px;">Warranty Period (months):</label>
+            <input type="number" id="warranty-period" min="0">
+        </div>
+
+        <div class="button-row">
+            <button id="save-product-btn">Save Product</button>
+            <button id="delete-product-btn" type="button" onclick="deleteProduct()">Delete Product</button>
+        </div>
+    </form>
+</div>
+<table id="product-table">
+    <thead>
+        <tr>
+            <th onclick="sortTable(0)">Product Name</th>
+            <th onclick="sortTable(1)">Price (₹)</th>
+            <th onclick="sortTable(2)">Buy Date</th>
+            <th onclick="sortTable(3)">Last Date of Warranty</th>
+            <th onclick="sortTable(4)">Age</th>
+            <th class="edit-column" style="display: none;">Edit</th>
+        </tr>
+    </thead>
+    <tbody id="product-table-body">
+    </tbody>
+</table>
+
+<script>
+    let products = JSON.parse(localStorage.getItem('products')) || [];
+    let isModifying = false;
+    let currentProductIndex = null;
+    let sortOrder = [true, true, true, true, true]; // true for ascending, false for descending
+
+    document.getElementById('add-product-btn').addEventListener('click', () => {
+        document.getElementById('product-form').style.display = 'block';
+        document.getElementById('product-form-input').reset();
+        document.getElementById('buy-date-day').value = '';
+        document.getElementById('buy-date-month').value = '';
+        document.getElementById('buy-date-year').value = '';
+        document.getElementById('warranty-registered').value = 'yes';
+        document.getElementById('warranty-period').disabled = false;
+    });
+
+    document.getElementById('warranty-registered').addEventListener('change', (e) => {
+        const warrantyPeriodInput = document.getElementById('warranty-period');
+        if (e.target.value === 'no') {
+            warrantyPeriodInput.disabled = true;
+            warrantyPeriodInput.value = '';
+        } else {
+            warrantyPeriodInput.disabled = false;
+        }
+    });
+
+    document.getElementById('save-product-btn').addEventListener('click', (e) => {
+        e.preventDefault();
+        const productName = document.getElementById('product-name').value;
+        const price = document.getElementById('price').value;
+        const buyDateDay = document.getElementById('buy-date-day').value;
+        const buyDateMonth = document.getElementById('buy-date-month').value;
+        const buyDateYear = document.getElementById('buy-date-year').value;
+        const warrantyRegistered = document.getElementById('warranty-registered').value;
+        const warrantyPeriod = document.getElementById('warranty-period').value;
+
+        const buyDate = `${buyDateDay}-${buyDateMonth}-${buyDateYear}`;
+
+        if (productName && price && buyDateDay && buyDateMonth && buyDateYear && warrantyRegistered) {
+            const product = {
+                productName,
+                price,
+                buyDate: buyDate,
+                warranty: warrantyRegistered === 'yes' && warrantyPeriod ? calculateWarrantyEndDate(buyDate, warrantyPeriod) : '---',
+                age: calculateAge(buyDate)
+            };
+
+            if (isModifying && currentProductIndex !== null) {
+                products[currentProductIndex] = product;
+                isModifying = false;
+                currentProductIndex = null;
+                exitModificationMode();
+            } else {
+                products.push(product);
+            }
+
+            localStorage.setItem('products', JSON.stringify(products));
+
+            document.getElementById('product-form').style.display = 'none';
+            document.getElementById('product-form-input').reset();
+
+            renderProductTable();
+        } else {
+            alert('Please fill in all fields.');
+        }
+    });
+
+    document.getElementById('import-btn').addEventListener('click', () => {
+        const importInput = document.createElement('input');
+        importInput.type = 'file';
+        importInput.accept = 'application/json';
+        importInput.addEventListener('change', (event) => {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    products = JSON.parse(e.target.result);
+                    localStorage.setItem('products', JSON.stringify(products));
+                    renderProductTable();
+                };
+                reader.readAsText(file);
+            }
+        });
+        importInput.click();
+    });
+
+    document.getElementById('export-btn').addEventListener('click', () => {
+        const blob = new Blob([JSON.stringify(products, null, 2)], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'products.json';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    });
+
+    document.getElementById('modify-btn').addEventListener('click', () => {
+        isModifying = !isModifying;
+        if (isModifying) {
+            enterModificationMode();
+        } else {
+            exitModificationMode();
+        }
+    });
+
+    function enterModificationMode() {
+        const modifyBtn = document.getElementById('modify-btn');
+        const buttons = document.querySelectorAll('#add-product-btn, #import-btn, #export-btn');
+
+        modifyBtn.textContent = 'Exit modification mode';
+        buttons.forEach(button => {
+            button.disabled = true;
+            button.classList.add('disabled');
+        });
+        document.querySelector('.edit-column').style.display = 'table-cell';
+        document.querySelectorAll('#product-table tbody tr').forEach(row => {
+            if (!row.querySelector('.edit-btn')) {
+                const editBtn = document.createElement('button');
+                editBtn.textContent = 'Edit';
+                editBtn.classList.add('edit-btn');
+                editBtn.addEventListener('click', () => handleRowClick(row));
+                const cell = document.createElement('td');
+                cell.style.textAlign = 'center';
+                cell.appendChild(editBtn);
+                row.appendChild(cell);
+            }
+        });
+    }
+
+    function exitModificationMode() {
+        const modifyBtn = document.getElementById('modify-btn');
+        const buttons = document.querySelectorAll('#add-product-btn, #import-btn, #export-btn');
+
+        modifyBtn.textContent = 'Modify';
+        buttons.forEach(button => {
+            button.disabled = false;
+            button.classList.remove('disabled');
+        });
+        document.querySelector('.edit-column').style.display = 'none';
+        document.querySelectorAll('.edit-btn').forEach(btn => btn.parentElement.remove());
+    }
+
+    function handleRowClick(row) {
+        const rowIndex = Array.from(row.parentNode.children).indexOf(row);
+        const product = products[rowIndex];
+        currentProductIndex = rowIndex;
+
+        document.getElementById('product-name').value = product.productName;
+        document.getElementById('price').value = product.price;
+        const [day, month, year] = product.buyDate.split('-');
+        document.getElementById('buy-date-day').value = day;
+        document.getElementById('buy-date-month').value = month;
+        document.getElementById('buy-date-year').value = year;
+        document.getElementById('warranty-registered').value = product.warranty === '---' ? 'no' : 'yes';
+        document.getElementById('warranty-period').value = product.warranty === '---' ? '' : calculateWarrantyPeriod(product.buyDate, product.warranty);
+
+        document.getElementById('warranty-period').disabled = product.warranty === '---';
+
+        document.getElementById('product-form').style.display = 'block';
+    }
+
+    function deleteProduct() {
+        if (currentProductIndex !== null) {
+            products.splice(currentProductIndex, 1);
+            localStorage.setItem('products', JSON.stringify(products));
+            document.getElementById('product-form').style.display = 'none';
+            document.getElementById('product-form-input').reset();
+            renderProductTable();
+        }
+    }
+
+    function renderProductTable() {
+        const tableBody = document.getElementById('product-table-body');
+        tableBody.innerHTML = '';
+
+        products.forEach((product, index) => {
+            const row = document.createElement('tr');
+            const warrantyDate = product.warranty;
+            const currentDate = new Date();
+            const warrantyEndDate = warrantyDate !== '---' ? new Date(warrantyDate.split('-').reverse().join('-')) : null;
+
+            const warrantyCellColor = warrantyEndDate && warrantyEndDate < currentDate ? 'red' : 'darkgreen';
+
+            row.innerHTML = `
+                <td>${product.productName}</td>
+                <td>₹${product.price}</td>
+                <td>${product.buyDate}</td>
+                <td style="background-color: ${warrantyEndDate ? warrantyCellColor : 'transparent'};">${product.warranty}</td>
+                <td>${product.age}</td>
+            `;
+            tableBody.appendChild(row);
+        });
+
+        if (isModifying) {
+            document.querySelectorAll('#product-table tbody tr').forEach(row => {
+                if (!row.querySelector('.edit-btn')) {
+                    const editBtn = document.createElement('button');
+                    editBtn.textContent = 'Edit';
+                    editBtn.classList.add('edit-btn');
+                    editBtn.addEventListener('click', () => handleRowClick(row));
+                    const cell = document.createElement('td');
+                    cell.style.textAlign = 'center';
+                    cell.appendChild(editBtn);
+                    row.appendChild(cell);
+                }
+            });
+        }
+    }
+
+    function closeForm() {
+        document.getElementById('product-form').style.display = 'none';
+    }
+
+    function formatDate(date) {
+        const [year, month, day] = date.split('-');
+        return `${day}-${month}-${year}`;
+    }
+
+    function formatDateInput(input) {
+        let value = input.value.replace(/[^0-9]/g, '');
+        if (value.length > 8) value = value.slice(0, 8); // Limit to 8 digits (ddmmyyyy)
+        let day = value.slice(0, 2);
+        let month = value.slice(2, 4);
+        let year = value.slice(4, 8);
+
+        if (month.length === 1 && parseInt(month) > 1) {
+            month = '0' + month; // Add leading zero if month is a single digit and greater than 1
+        }
+
+        const formattedValue = `${day}${month ? '-' + month : ''}${year ? '-' + year : ''}`;
+        const cursorPosition = input.selectionStart;
+        const previousLength = input.value.length;
+
+        input.value = formattedValue;
+
+        // Adjust cursor position
+        const newLength = input.value.length;
+        const diff = newLength - previousLength;
+
+        input.setSelectionRange(cursorPosition + diff, cursorPosition + diff);
+    }
+
+    function calculateWarrantyEndDate(buyDate, warrantyPeriod) {
+        const buyDateObj = new Date(buyDate.split('-').reverse().join('-'));
+        buyDateObj.setMonth(buyDateObj.getMonth() + parseInt(warrantyPeriod));
+        return formatDate(buyDateObj.toISOString().split('T')[0]);
+    }
+
+    function calculateWarrantyPeriod(buyDate, warrantyEndDate) {
+        const buyDateObj = new Date(buyDate.split('-').reverse().join('-'));
+        const warrantyEndDateObj = new Date(warrantyEndDate.split('-').reverse().join('-'));
+        const diffInMonths = (warrantyEndDateObj.getFullYear() - buyDateObj.getFullYear()) * 12 + (warrantyEndDateObj.getMonth() - buyDateObj.getMonth());
+        return diffInMonths;
+    }
+
+    function calculateAge(buyDate) {
+        const buyDateObj = new Date(buyDate.split('-').reverse().join('-'));
+        const currentDate = new Date();
+        const diffInTime = currentDate - buyDateObj;
+
+        if (diffInTime < 1000 * 3600 * 24) {
+            return 'Just bought';
+        }
+
+        const diffInDays = Math.floor(diffInTime / (1000 * 3600 * 24));
+        const years = Math.floor(diffInDays / 365);
+        const months = Math.floor((diffInDays % 365) / 30);
+        const days = diffInDays % 365 % 30;
+
+        let ageString = '';
+        if (years > 0) ageString += `${years} year${years > 1 ? 's' : ''} `;
+        if (months > 0) ageString += `${months} month${months > 1 ? 's' : ''} `;
+        if (days > 0) ageString += `${days} day${days > 1 ? 's' : ''}`;
+
+        return ageString.trim();
+    }
+
+    function sortTable(columnIndex) {
+        const isAscending = sortOrder[columnIndex];
+        products.sort((a, b) => {
+            let valA = Object.values(a)[columnIndex];
+            let valB = Object.values(b)[columnIndex];
+
+            if (columnIndex === 0) { // Product Name
+                valA = valA.toLowerCase();
+                valB = valB.toLowerCase();
+            } else if (columnIndex === 1) { // Price
+                valA = parseFloat(valA.replace('₹', ''));
+                valB = parseFloat(valB.replace('₹', ''));
+            } else if (columnIndex === 2 || columnIndex === 3) { // Dates
+                valA = new Date(valA.split('-').reverse().join('-'));
+                valB = new Date(valB.split('-').reverse().join('-'));
+            } else if (columnIndex === 4) { // Age
+                valA = parseInt(valA.split(' ')[0]);
+                valB = parseInt(valB.split(' ')[0]);
+            }
+
+            if (valA < valB) return isAscending ? -1 : 1;
+            if (valA > valB) return isAscending ? 1 : -1;
+            return 0;
+        });
+
+        sortOrder[columnIndex] = !isAscending;
+        renderProductTable();
+    }
+
+    function moveToNextInput(event, nextInputId) {
+        if (event.key === 'Enter') {
+            event.preventDefault();
+            document.getElementById(nextInputId).focus();
+        }
+    }
+
+    renderProductTable();
+</script>
+
+</body>
+</html>

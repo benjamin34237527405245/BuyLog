@@ -1,0 +1,31 @@
+{
+    "name": "BuyLog",
+    "short_name": "BuyLog",
+    "start_url": "index.html",
+    "display": "standalone",
+    "background_color": "#121212",
+    "theme_color": "#4B0082",
+    "description": "A web application to track product purchases.",
+    "icons": [
+      {
+        "src": "buy.png",
+        "sizes": "128x128",
+        "type": "image/png"
+      },
+      {
+        "src": "buysvj.svg",
+        "sizes": "any",
+        "type": "image/svg+xml"
+      },
+      {
+        "src": "buysmall.jpg",
+        "sizes": "16x16",
+        "type": "image/jpg"
+      },
+      {
+        "src": "buybig.png",
+        "sizes": "512x512",
+        "type": "image/png"
+      }
+    ]
+  }
