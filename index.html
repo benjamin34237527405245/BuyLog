@@ -306,23 +306,35 @@
     });
 
     document.getElementById('import-btn').addEventListener('click', () => {
-        const importInput = document.createElement('input');
-        importInput.type = 'file';
-        importInput.accept = 'application/json';
-        importInput.addEventListener('change', (event) => {
-            const file = event.target.files[0];
-            if (file) {
-                const reader = new FileReader();
-                reader.onload = (e) => {
-                    products = JSON.parse(e.target.result);
-                    localStorage.setItem('products', JSON.stringify(products));
-                    renderProductTable();
-                };
-                reader.readAsText(file);
-            }
-        });
-        importInput.click();
+    const importInput = document.createElement('input');
+    importInput.type = 'file';
+    importInput.accept = 'application/json';
+    importInput.addEventListener('change', (event) => {
+        const file = event.target.files[0];
+        if (file) {
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                try {
+                    const importedProducts = JSON.parse(e.target.result);
+
+                    // Ensure imported data is valid and in the expected format
+                    if (Array.isArray(importedProducts)) {
+                        products = [...products, ...importedProducts]; // Merge existing and imported products
+                        localStorage.setItem('products', JSON.stringify(products));
+                        renderProductTable();
+                    } else {
+                        alert('Invalid file format. Please upload a valid JSON file.');
+                    }
+                } catch (error) {
+                    alert('Error parsing file. Please upload a valid JSON file.');
+                }
+            };
+            reader.readAsText(file);
+        }
     });
+    importInput.click();
+});
+
 
     document.getElementById('export-btn').addEventListener('click', () => {
         const blob = new Blob([JSON.stringify(products, null, 2)], { type: 'application/json' });
@@ -518,42 +530,45 @@
     }
 
     function sortTable(columnIndex) {
-        const isAscending = sortOrder[columnIndex];
-        products.sort((a, b) => {
-            let valA = Object.values(a)[columnIndex];
-            let valB = Object.values(b)[columnIndex];
+    // Toggle the sorting order for the given column
+    sortOrder[columnIndex] = !sortOrder[columnIndex];
 
-            if (columnIndex === 0) { // Product Name
-                valA = valA.toLowerCase();
-                valB = valB.toLowerCase();
-            } else if (columnIndex === 1) { // Price
-                valA = parseFloat(valA.replace('₹', ''));
-                valB = parseFloat(valB.replace('₹', ''));
-            } else if (columnIndex === 2 || columnIndex === 3) { // Dates
-                valA = new Date(valA.split('-').reverse().join('-'));
-                valB = new Date(valB.split('-').reverse().join('-'));
-            } else if (columnIndex === 4) { // Age
-                valA = parseInt(valA.split(' ')[0]);
-                valB = parseInt(valB.split(' ')[0]);
-            }
+    // Sort the products array based on the selected column
+    products.sort((a, b) => {
+        let valA, valB;
 
-            if (valA < valB) return isAscending ? -1 : 1;
-            if (valA > valB) return isAscending ? 1 : -1;
-            return 0;
-        });
-
-        sortOrder[columnIndex] = !isAscending;
-        renderProductTable();
-    }
-
-    function moveToNextInput(event, nextInputId) {
-        if (event.key === 'Enter') {
-            event.preventDefault();
-            document.getElementById(nextInputId).focus();
+        switch (columnIndex) {
+            case 0: // Product Name
+                valA = a.productName.toLowerCase();
+                valB = b.productName.toLowerCase();
+                break;
+            case 1: // Price
+                valA = parseFloat(a.price);
+                valB = parseFloat(b.price);
+                break;
+            case 2: // Buy Date
+                valA = new Date(a.buyDate.split('-').reverse().join('-'));
+                valB = new Date(b.buyDate.split('-').reverse().join('-'));
+                break;
+            case 3: // Last Date of Warranty
+                valA = a.warranty === '---' ? null : new Date(a.warranty.split('-').reverse().join('-'));
+                valB = b.warranty === '---' ? null : new Date(b.warranty.split('-').reverse().join('-'));
+                break;
+            case 4: // Age
+                valA = a.age;
+                valB = b.age;
+                break;
         }
-    }
 
+        if (valA < valB) return sortOrder[columnIndex] ? -1 : 1;
+        if (valA > valB) return sortOrder[columnIndex] ? 1 : -1;
+        return 0;
+    });
+
+    // Re-render the product table after sorting
     renderProductTable();
+}
+
 </script>
 
 </body>
