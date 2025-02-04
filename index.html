@@ -314,7 +314,8 @@
             if (file) {
                 const reader = new FileReader();
                 reader.onload = (e) => {
-                    products = JSON.parse(e.target.result);
+                    const importedProducts = JSON.parse(e.target.result);
+                    products = products.concat(importedProducts);
                     localStorage.setItem('products', JSON.stringify(products));
                     renderProductTable();
                 };
@@ -428,7 +429,7 @@
                 <td>₹${product.price}</td>
                 <td>${product.buyDate}</td>
                 <td style="background-color: ${warrantyEndDate ? warrantyCellColor : 'transparent'};">${product.warranty}</td>
-                <td>${product.age}</td>
+                <td>${calculateAge(product.buyDate)}</td>
             `;
             tableBody.appendChild(row);
         });
@@ -557,4 +558,4 @@
 </script>
 
 </body>
-</html> 
+</html>
